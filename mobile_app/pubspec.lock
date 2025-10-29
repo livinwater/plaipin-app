@@ -270,6 +270,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.2"
+  flutter_dotenv:
+    dependency: "direct main"
+    description:
+      name: flutter_dotenv
+      sha256: b7c7be5cd9f6ef7a78429cabd2774d3c4af50e79cb2b7593e3d5d763ef95c61b
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.2.1"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -600,6 +608,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.9.1"
+  privy_flutter:
+    dependency: "direct main"
+    description:
+      name: privy_flutter
+      sha256: bbab1810fb24cbac66264f83fc231f83e76693ecc2a6744da6bf371f3f3609f2
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.0"
   provider:
     dependency: "direct main"
     description:

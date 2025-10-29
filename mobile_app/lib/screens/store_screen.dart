@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/wallet_service.dart';
+import '../services/privy_wallet_service.dart';
+import 'privy_login_screen.dart';
 
 /// Store Screen
 /// Browse and view items (hardcoded for Phase 2)
@@ -426,10 +428,15 @@ class _WalletButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<WalletService>(
-      builder: (context, walletService, child) {
-        // Error state
-        if (walletService.connectionState == WalletConnectionState.error) {
+    return Consumer2<WalletService, PrivyWalletService>(
+      builder: (context, walletService, privyService, child) {
+        // Check if any wallet is connected
+        final isPhantomConnected = walletService.isConnected;
+        final isPrivyConnected = privyService.isAuthenticated && privyService.solanaAddress != null;
+        final isAnyConnected = isPhantomConnected || isPrivyConnected;
+        
+        // Error state (Phantom only, Privy handles errors internally)
+        if (walletService.connectionState == WalletConnectionState.error && !isAnyConnected) {
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
@@ -454,7 +461,7 @@ class _WalletButton extends StatelessWidget {
         }
         
         // Connecting state
-        if (walletService.isConnecting) {
+        if (walletService.isConnecting || privyService.isLoading) {
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
@@ -483,10 +490,20 @@ class _WalletButton extends StatelessWidget {
           );
         }
         
-        // Connected state
-        if (walletService.isConnected) {
+        // Connected state - show connected wallet
+        if (isAnyConnected) {
+          final address = isPhantomConnected 
+              ? walletService.getShortenedAddress()
+              : privyService.getShortenedAddress();
+          final walletType = isPhantomConnected ? 'Phantom' : 'Privy';
+          
           return GestureDetector(
-            onTap: () => _showWalletMenu(context, walletService),
+            onTap: () => _showConnectedWalletMenu(
+              context, 
+              walletService, 
+              privyService,
+              isPhantomConnected,
+            ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
@@ -506,12 +523,25 @@ class _WalletButton extends StatelessWidget {
                 children: [
                   const Icon(Icons.account_balance_wallet, size: 20, color: Colors.white),
                   const SizedBox(width: 8),
-                  Text(
-                    walletService.getShortenedAddress(),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        address,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        walletType,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white70,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(width: 4),
                   const Icon(Icons.arrow_drop_down, size: 20, color: Colors.white),
@@ -521,9 +551,9 @@ class _WalletButton extends StatelessWidget {
           );
         }
         
-        // Disconnected state - connect button
+        // Disconnected state - connect button (shows wallet options)
         return ElevatedButton.icon(
-          onPressed: () => _handleConnect(context, walletService),
+          onPressed: () => _showWalletOptions(context),
           icon: const Icon(Icons.account_balance_wallet, size: 20),
           label: const Text('Connect Wallet'),
           style: ElevatedButton.styleFrom(
@@ -540,25 +570,8 @@ class _WalletButton extends StatelessWidget {
     );
   }
   
-  void _handleConnect(BuildContext context, WalletService walletService) async {
-    // Clear any previous errors
-    walletService.clearError();
-    
-    // Attempt to connect
-    await walletService.connectWallet();
-    
-    // Show info about Phantom app
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Opening Phantom wallet... Approve the connection request.'),
-          duration: Duration(seconds: 3),
-        ),
-      );
-    }
-  }
-  
-  void _showWalletMenu(BuildContext context, WalletService walletService) {
+  /// Show wallet selection dialog (Phantom or Privy)
+  void _showWalletOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -569,83 +582,212 @@ class _WalletButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Wallet icon
+            Text(
+              'Connect Wallet',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Choose how you want to connect',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Phantom Option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppTheme.primaryPurple, AppTheme.primaryPurple.withOpacity(0.7)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.account_balance_wallet, color: Colors.white),
+              ),
+              title: const Text(
+                'Phantom Wallet',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: const Text('Use your existing Phantom wallet'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.pop(context);
+                _connectPhantom(context);
+              },
+            ),
+            
+            const Divider(height: 32),
+            
+            // Privy Option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppTheme.primaryPink, AppTheme.primaryPink.withOpacity(0.7)],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.add_circle, color: Colors.white),
+              ),
+              title: const Text(
+                'Create with Privy',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: const Text('Create a new embedded wallet'),
+              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () {
+                Navigator.pop(context);
+                _connectPrivy(context);
+              },
+            ),
+            
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  /// Connect with Phantom wallet (deep-link)
+  void _connectPhantom(BuildContext context) async {
+    final walletService = Provider.of<WalletService>(context, listen: false);
+    
+    // Clear any previous errors
+    walletService.clearError();
+    
+    // Connect to Phantom wallet via deep-link
+    await walletService.connectWallet();
+    
+    // Show instructions to user
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '✨ Opening Phantom wallet...\n'
+            'Please approve the connection request.',
+          ),
+          duration: Duration(seconds: 3),
+          backgroundColor: Colors.deepPurple,
+        ),
+      );
+    }
+  }
+  
+  /// Connect with Privy (embedded wallet)
+  void _connectPrivy(BuildContext context) async {
+    // Navigate to Privy login flow
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PrivyLoginScreen()),
+    );
+    
+    if (result != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Wallet connected: $result'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+  
+  /// Show connected wallet menu (for disconnect)
+  void _showConnectedWalletMenu(
+    BuildContext context,
+    WalletService phantomService,
+    PrivyWalletService privyService,
+    bool isPhantom,
+  ) {
+    final walletAddress = isPhantom ? phantomService.walletAddress : privyService.solanaAddress;
+    final walletType = isPhantom ? 'Phantom' : 'Privy Embedded';
+    
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Wallet type badge
             Container(
-              width: 80,
-              height: 80,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppTheme.primaryPink, AppTheme.primaryPurple],
+                  colors: isPhantom 
+                      ? [AppTheme.primaryPurple, AppTheme.primaryPurple.withOpacity(0.7)]
+                      : [AppTheme.primaryPink, AppTheme.primaryPink.withOpacity(0.7)],
                 ),
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: const Icon(
-                Icons.account_balance_wallet,
-                size: 40,
-                color: Colors.white,
+              child: Text(
+                walletType,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Wallet address
+            Text(
+              'Connected Wallet',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 16),
-            
-            // Wallet title
-            Text(
-              'Connected Wallet',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            
-            // Full wallet address
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppTheme.lightGray,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: SelectableText(
-                walletService.walletAddress ?? '',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                walletAddress ?? 'Unknown',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontFamily: 'monospace',
                 ),
-                textAlign: TextAlign.center,
               ),
             ),
-            
             const SizedBox(height: 24),
             
             // Disconnect button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.pop(context);
-                  walletService.disconnectWallet();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Wallet disconnected'),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.logout),
-                label: const Text('Disconnect Wallet'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade400,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            ElevatedButton.icon(
+              onPressed: () {
+                if (isPhantom) {
+                  phantomService.disconnectWallet();
+                } else {
+                  privyService.logout();
+                }
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Wallet disconnected'),
+                    duration: Duration(seconds: 2),
                   ),
+                );
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text('Disconnect'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade400,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Cancel button
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
               ),
             ),
           ],

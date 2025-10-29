@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:app_links/app_links.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:async';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
@@ -9,10 +10,14 @@ import 'screens/inventory_screen.dart';
 import 'screens/journal_screen.dart';
 import 'screens/device_screen.dart';
 import 'services/wallet_service.dart';
+import 'services/privy_wallet_service.dart';
 // Note: mood_screen.dart is available but currently not in main navigation
 // Can be added as a 6th tab or integrated into journal screen in Phase 4
 
-void main() {
+Future<void> main() async {
+  // Load environment variables from .env file
+  await dotenv.load(fileName: '.env');
+  
   runApp(const CompanionApp());
 }
 
@@ -21,8 +26,11 @@ class CompanionApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => WalletService(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => WalletService()),
+        ChangeNotifierProvider(create: (_) => PrivyWalletService()),
+      ],
       child: MaterialApp(
         title: 'Mobile Companion',
         theme: AppTheme.lightTheme,
