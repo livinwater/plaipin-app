@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:model_viewer_plus/model_viewer_plus.dart';
 import '../theme/app_theme.dart';
-import '../widgets/companion_widget.dart';
 
 /// Home Screen
 /// Main screen with companion animation
@@ -11,25 +11,9 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> {
   int _companionMood = 75;
   int _interactionCount = 42;
-  late AnimationController _pulseController;
-  
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
-  }
-  
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,10 +38,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               children: [
                 const Spacer(),
                 
-                // Just the companion character - clean and centered
-                CompanionWidget(
-                  mood: _companionMood,
-                  onTap: _onCompanionTap,
+                // 3D Rabbit Model - clean and centered
+                Container(
+                  height: 400,
+                  width: 400,
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+                        AppTheme.primaryPink.withOpacity(0.1),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      ModelViewer(
+                        src: 'assets/models/rabbit.glb',
+                        alt: 'Buddy the Companion',
+                        autoRotate: true,
+                        autoRotateDelay: 0,
+                        cameraControls: true,
+                        touchAction: TouchAction.panY,
+                        interactionPrompt: InteractionPrompt.none,
+                        loading: Loading.eager,
+                        ar: false,
+                      ),
+                      // Debug indicator
+                      Positioned(
+                        bottom: 10,
+                        right: 10,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.black54,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            '3D Model Loading...',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 
                 const SizedBox(height: 24),
@@ -105,13 +131,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (mood >= 40) return 'Neutral';
     if (mood >= 20) return 'Sad';
     return 'Very Sad';
-  }
-  
-  void _onCompanionTap() {
-    setState(() {
-      _companionMood = (_companionMood + 5).clamp(0, 100);
-      _interactionCount++;
-    });
   }
 }
 

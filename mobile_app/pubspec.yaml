@@ -68,6 +68,9 @@ dependencies:
   
   # Fonts
   google_fonts: ^6.1.0
+  
+  # 3D Model Viewer
+  model_viewer_plus: ^1.7.2
 
 dev_dependencies:
   flutter_test:
@@ -95,6 +98,7 @@ flutter:
   assets:
     - assets/animations/
     - assets/images/
+    - assets/models/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
