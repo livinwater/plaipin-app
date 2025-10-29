@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../services/wallet_service.dart';
 
 /// Store Screen
 /// Browse and view items (hardcoded for Phase 2)
@@ -20,31 +22,13 @@ class _StoreScreenState extends State<StoreScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Coins display
+            // Wallet button (replaces coins display)
             Padding(
               padding: const EdgeInsets.all(20.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.pastelYellow,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.monetization_on, size: 20),
-                        const SizedBox(width: 4),
-                        Text(
-                          '1,250',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _WalletButton(),
                 ],
               ),
             ),
@@ -436,4 +420,240 @@ final List<_StoreItem> _hardcodedItems = [
     gradientColors: [AppTheme.moodHappy, AppTheme.primaryPink],
   ),
 ];
+
+/// Wallet Button Widget
+/// Shows wallet connection status and allows connect/disconnect
+class _WalletButton extends StatelessWidget {
+  const _WalletButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<WalletService>(
+      builder: (context, walletService, child) {
+        // Error state
+        if (walletService.connectionState == WalletConnectionState.error) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.red.shade100,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.red, width: 1),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, size: 20, color: Colors.red),
+                const SizedBox(width: 8),
+                Text(
+                  'Error',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        
+        // Connecting state
+        if (walletService.isConnecting) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppTheme.pastelBlue,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Connecting...',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        
+        // Connected state
+        if (walletService.isConnected) {
+          return GestureDetector(
+            onTap: () => _showWalletMenu(context, walletService),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppTheme.primaryPink, AppTheme.primaryPurple],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primaryPink.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_balance_wallet, size: 20, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(
+                    walletService.getShortenedAddress(),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down, size: 20, color: Colors.white),
+                ],
+              ),
+            ),
+          );
+        }
+        
+        // Disconnected state - connect button
+        return ElevatedButton.icon(
+          onPressed: () => _handleConnect(context, walletService),
+          icon: const Icon(Icons.account_balance_wallet, size: 20),
+          label: const Text('Connect Wallet'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.primaryPink,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            elevation: 4,
+          ),
+        );
+      },
+    );
+  }
+  
+  void _handleConnect(BuildContext context, WalletService walletService) async {
+    // Clear any previous errors
+    walletService.clearError();
+    
+    // Attempt to connect
+    await walletService.connectWallet();
+    
+    // Show info about Phantom app
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Opening Phantom wallet... Approve the connection request.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+  
+  void _showWalletMenu(BuildContext context, WalletService walletService) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Wallet icon
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppTheme.primaryPink, AppTheme.primaryPurple],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.account_balance_wallet,
+                size: 40,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Wallet title
+            Text(
+              'Connected Wallet',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 8),
+            
+            // Full wallet address
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.lightGray,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SelectableText(
+                walletService.walletAddress ?? '',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontFamily: 'monospace',
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // Disconnect button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  walletService.disconnectWallet();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Wallet disconnected'),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.logout),
+                label: const Text('Disconnect Wallet'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade400,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 12),
+            
+            // Cancel button
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:app_links/app_links.dart';
+import 'dart:async';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/store_screen.dart';
 import 'screens/inventory_screen.dart';
 import 'screens/journal_screen.dart';
 import 'screens/device_screen.dart';
+import 'services/wallet_service.dart';
 // Note: mood_screen.dart is available but currently not in main navigation
 // Can be added as a 6th tab or integrated into journal screen in Phase 4
 
@@ -17,11 +21,14 @@ class CompanionApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Mobile Companion',
-      theme: AppTheme.lightTheme,
-      home: const MainNavigation(),
-      debugShowCheckedModeBanner: false,
+    return ChangeNotifierProvider(
+      create: (_) => WalletService(),
+      child: MaterialApp(
+        title: 'Mobile Companion',
+        theme: AppTheme.lightTheme,
+        home: const MainNavigation(),
+        debugShowCheckedModeBanner: false,
+      ),
     );
   }
 }
@@ -35,6 +42,8 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
 
   static const List<Widget> _screens = [
     HomeScreen(),
@@ -43,6 +52,65 @@ class _MainNavigationState extends State<MainNavigation> {
     JournalScreen(),
     DeviceScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  /// Initialize deep-link listening for wallet connection
+  void _initDeepLinks() async {
+    _appLinks = AppLinks();
+
+    // Handle initial link if app was opened via deep link
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        _handleDeepLink(initialUri);
+      }
+    } catch (e) {
+      debugPrint('Error getting initial deep link: $e');
+    }
+
+    // Listen for deep links while app is running
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      _handleDeepLink(uri);
+    }, onError: (err) {
+      debugPrint('Error listening to deep links: $err');
+    });
+  }
+
+  /// Handle incoming deep link from Phantom wallet
+  void _handleDeepLink(Uri uri) {
+    debugPrint('Received deep link: $uri');
+
+    // Check if this is a wallet connection redirect
+    if (uri.scheme == 'companion' && uri.host == 'connected') {
+      final walletService = Provider.of<WalletService>(context, listen: false);
+      walletService.handleDeepLink(uri);
+
+      // Navigate to Store screen to show connected wallet
+      setState(() {
+        _selectedIndex = 1; // Store tab
+      });
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Wallet connected successfully!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {

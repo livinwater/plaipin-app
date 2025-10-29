@@ -40,6 +40,10 @@ dependencies:
   
   # Wallet integration
   url_launcher: ^6.2.0
+  app_links: ^6.3.2  # For deep-link handling
+  cryptography: ^2.7.0  # For encryption
+  bs58: ^1.0.2  # For base58 encoding
+  pinenacl: ^0.6.0  # TweetNaCl-compatible NaCl implementation
   
   # Voice features
   speech_to_text: ^6.6.0
