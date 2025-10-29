@@ -14,7 +14,7 @@ class StoreScreen extends StatefulWidget {
 
 class _StoreScreenState extends State<StoreScreen> {
   String _selectedCategory = 'All';
-  final List<String> _categories = ['All', 'Outfits', 'Accessories', 'Backgrounds'];
+  final List<String> _categories = ['All', 'Accessories', 'Mini-apps','Backgrounds'];
 
   @override
   Widget build(BuildContext context) {
@@ -155,10 +155,17 @@ class _StoreItemCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.monetization_on, size: 16, color: AppTheme.primaryPink),
+                          Text(
+                            '◎',  // SOL symbol
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: AppTheme.primaryPink,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(width: 4),
                           Text(
-                            '${item.price}',
+                            '${item.price.toStringAsFixed(2)}',  // Show 2 decimal places
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               color: AppTheme.primaryPink,
                               fontWeight: FontWeight.bold,
@@ -229,7 +236,7 @@ class _StoreItemCard extends StatelessWidget {
                     const SnackBar(content: Text('Purchase feature coming in Phase 4!')),
                   );
                 },
-                child: Text(item.isOwned ? 'Already Owned' : 'Buy for ${item.price} coins'),
+                child: Text(item.isOwned ? 'Already Owned' : 'Buy for ◎${item.price.toStringAsFixed(2)} SOL'),
               ),
             ),
           ],
@@ -244,7 +251,7 @@ class _StoreItem {
   final String id;
   final String name;
   final String description;
-  final int price;
+  final double price;  // Changed to double for SOL prices
   final String category;
   final IconData icon;
   final List<Color> gradientColors;
@@ -266,38 +273,38 @@ final List<_StoreItem> _hardcodedItems = [
   // Outfits
   _StoreItem(
     id: '1',
-    name: 'Casual Tee',
-    description: 'Comfortable everyday outfit for your companion',
-    price: 100,
-    category: 'Outfits',
+    name: 'Yellow Ribbon',
+    description: 'Cutest ribbon for Plaipin',
+    price: 0.01,
+    category: 'Accessories',
     icon: Icons.checkroom,
     gradientColors: [AppTheme.pastelBlue, AppTheme.pastelPurple],
     isOwned: true,
   ),
   _StoreItem(
     id: '2',
-    name: 'Party Dress',
-    description: 'Sparkly dress for special occasions',
-    price: 250,
-    category: 'Outfits',
+    name: 'Mint Scarf',
+    description: 'Comfy warm scarf for cold days',
+    price: 0.025,
+    category: 'Accessories',
     icon: Icons.celebration,
     gradientColors: [AppTheme.primaryPink, AppTheme.primaryPurple],
   ),
   _StoreItem(
     id: '3',
-    name: 'Cozy Hoodie',
-    description: 'Warm and comfy for cold days',
-    price: 150,
-    category: 'Outfits',
+    name: 'Flower Crown',
+    description: 'A ring of flowers for the cutest PlaiPin',
+    price: 0.015,
+    category: 'Accessories',
     icon: Icons.hot_tub,
     gradientColors: [AppTheme.pastelGreen, AppTheme.pastelBlue],
   ),
   _StoreItem(
     id: '4',
-    name: 'Sport Outfit',
-    description: 'Active wear for energetic companions',
-    price: 180,
-    category: 'Outfits',
+    name: 'Bead Bracelet',
+    description: 'Wearing it on the ears because why not?',
+    price: 0.018,
+    category: 'Accessories',
     icon: Icons.sports_soccer,
     gradientColors: [AppTheme.moodExcited, AppTheme.moodHappy],
   ),
@@ -305,9 +312,9 @@ final List<_StoreItem> _hardcodedItems = [
   // Accessories
   _StoreItem(
     id: '5',
-    name: 'Cool Glasses',
-    description: 'Stylish sunglasses for your companion',
-    price: 80,
+    name: 'Little Spinner Hat',
+    description: 'Because spinning is fun!',
+    price: 0.012,
     category: 'Accessories',
     icon: Icons.visibility,
     gradientColors: [AppTheme.darkGray, AppTheme.black],
@@ -315,9 +322,9 @@ final List<_StoreItem> _hardcodedItems = [
   ),
   _StoreItem(
     id: '6',
-    name: 'Cute Hat',
-    description: 'Adorable hat to keep the sun away',
-    price: 120,
+    name: 'Small Rounded Glasses',
+    description: 'Too much screen time is bad for your eyes',
+    price: 0.01,
     category: 'Accessories',
     icon: Icons.emoji_emotions,
     gradientColors: [AppTheme.pastelYellow, AppTheme.pastelPink],
@@ -383,39 +390,30 @@ final List<_StoreItem> _hardcodedItems = [
   // More outfits
   _StoreItem(
     id: '13',
-    name: 'Pajamas',
-    description: 'Comfy sleepwear for bedtime',
-    price: 130,
-    category: 'Outfits',
-    icon: Icons.bedtime,
+    name: 'Daily Fortune',
+    description: 'Tells you your daily fortune',
+    price: 0.1,
+    category: 'Mini-apps',
+    icon: Icons.stars,
     gradientColors: [AppTheme.pastelPurple, AppTheme.pastelPink],
-  ),
-  _StoreItem(
-    id: '14',
-    name: 'Rain Coat',
-    description: 'Stay dry in rainy weather',
-    price: 160,
-    category: 'Outfits',
-    icon: Icons.umbrella,
-    gradientColors: [AppTheme.pastelYellow, AppTheme.moodHappy],
   ),
   
   // More accessories
   _StoreItem(
-    id: '15',
-    name: 'Backpack',
-    description: 'Adventure-ready backpack',
-    price: 110,
-    category: 'Accessories',
+    id: '14',
+    name: 'Proximity Tag',
+    description: 'Pass between your PlaiPin and other PlaiPins to see who is nearby',
+    price: 0.05,
+    category: 'Mini-apps',
     icon: Icons.backpack,
     gradientColors: [AppTheme.moodCalm, AppTheme.pastelBlue],
   ),
   _StoreItem(
-    id: '16',
-    name: 'Crown',
-    description: 'Royal crown for your companion',
-    price: 500,
-    category: 'Accessories',
+    id: '15',
+    name: 'Daily Glazing',
+    description: 'Tells you 3 amazing things about yourself every day',
+    price: 0.1,
+    category: 'Mini-apps',
     icon: Icons.stars,
     gradientColors: [AppTheme.moodHappy, AppTheme.primaryPink],
   ),

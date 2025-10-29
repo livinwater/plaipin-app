@@ -343,7 +343,7 @@ class _InventoryItem {
 final List<_InventoryItem> _ownedItems = [
   _InventoryItem(
     id: '1',
-    name: 'Casual Tee',
+    name: 'Ribbon',
     category: 'Outfits',
     icon: Icons.checkroom,
     gradientColors: [AppTheme.pastelBlue, AppTheme.pastelPurple],
