@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/journal_entry.dart';
 import '../theme/app_theme.dart';
+import '../services/cartesia_service.dart';
 
 /// Journal Entry Detail Screen
 /// Shows PlaiPin's full diary entry with audio playback
@@ -18,9 +22,147 @@ class JournalEntryDetail extends StatefulWidget {
 }
 
 class _JournalEntryDetailState extends State<JournalEntryDetail> {
-  bool _isPlaying = false;
-  double _playbackProgress = 0.0;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  final CartesiaService _cartesiaService = CartesiaService();
   
+  bool _isPlaying = false;
+  bool _isLoading = false;
+  double _playbackProgress = 0.0;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+  String? _errorMessage;
+  
+  @override
+  void initState() {
+    super.initState();
+    _setupAudioPlayer();
+  }
+  
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+  
+  void _setupAudioPlayer() {
+    // Listen to player state changes
+    _audioPlayer.playerStateStream.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state.playing;
+        });
+      }
+    });
+    
+    // Listen to position changes
+    _audioPlayer.positionStream.listen((position) {
+      if (mounted) {
+        setState(() {
+          _position = position;
+          if (_duration.inMilliseconds > 0) {
+            _playbackProgress = position.inMilliseconds / _duration.inMilliseconds;
+          }
+        });
+      }
+    });
+    
+    // Listen to duration changes
+    _audioPlayer.durationStream.listen((duration) {
+      if (mounted && duration != null) {
+        setState(() {
+          _duration = duration;
+        });
+      }
+    });
+    
+    // Listen for completion
+    _audioPlayer.processingStateStream.listen((state) {
+      if (state == ProcessingState.completed) {
+        if (mounted) {
+          setState(() {
+            _isPlaying = false;
+            _playbackProgress = 0.0;
+            _position = Duration.zero;
+          });
+        }
+        _audioPlayer.seek(Duration.zero);
+        _audioPlayer.pause();
+      }
+    });
+  }
+  
+  Future<void> _togglePlayback() async {
+    if (_isPlaying) {
+      await _audioPlayer.pause();
+    } else {
+      // If not loaded yet, generate and load audio
+      if (_audioPlayer.processingState == ProcessingState.idle) {
+        await _loadAndPlayAudio();
+      } else {
+        await _audioPlayer.play();
+      }
+    }
+  }
+  
+  Future<void> _loadAndPlayAudio() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    
+    try {
+      // Detect emotion from mood
+      final emotion = _cartesiaService.detectEmotionFromMood(widget.entry.mood);
+      
+      // Generate speech with Cartesia
+      final audioBytes = await _cartesiaService.generateSpeech(
+        text: widget.entry.entryText,
+        emotion: emotion,
+        speed: 1.1, // Slightly faster for childlike voice
+      );
+      
+      // Save to temporary file (fixes iOS/macOS audio error -11828)
+      final tempDir = await getTemporaryDirectory();
+      final audioFile = File('${tempDir.path}/plaipin_diary_${widget.entry.id}.wav');
+      await audioFile.writeAsBytes(audioBytes);
+      
+      // Load audio from file
+      await _audioPlayer.setAudioSource(
+        AudioSource.file(audioFile.path),
+      );
+      
+      // Start playing
+      await _audioPlayer.play();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎵 PlaiPin is reading the diary!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load audio: $e';
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormatter = DateFormat('EEEE, MMMM d, y');
@@ -83,7 +225,7 @@ class _JournalEntryDetailState extends State<JournalEntryDetail> {
                       ),
                       child: Center(
                         child: Text(
-                          '🎀', // PlaiPin emoji
+                          '🎀', // PlaiPin emoji with yellow bow
                           style: const TextStyle(fontSize: 40),
                         ),
                       ),
@@ -201,26 +343,22 @@ class _JournalEntryDetailState extends State<JournalEntryDetail> {
                       ),
                     ],
                   ),
-                  child: IconButton(
-                    icon: Icon(
-                      _isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isPlaying = !_isPlaying;
-                        // TODO: Implement actual audio playback
-                      });
-                      
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(_isPlaying ? '🎵 Playing PlaiPin\'s voice!' : '⏸️ Paused'),
-                          duration: const Duration(seconds: 1),
+                  child: _isLoading
+                      ? const Padding(
+                          padding: EdgeInsets.all(12.0),
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        )
+                      : IconButton(
+                          icon: Icon(
+                            _isPlaying ? Icons.pause : Icons.play_arrow,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                          onPressed: _togglePlayback,
                         ),
-                      );
-                    },
-                  ),
                 ),
                 
                 const SizedBox(width: 16),
@@ -237,7 +375,9 @@ class _JournalEntryDetailState extends State<JournalEntryDetail> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        widget.entry.formattedDuration,
+                        _duration.inSeconds > 0
+                            ? '${_position.inMinutes}:${(_position.inSeconds % 60).toString().padLeft(2, '0')} / ${_duration.inMinutes}:${(_duration.inSeconds % 60).toString().padLeft(2, '0')}'
+                            : 'Tap to generate',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppTheme.darkGray,
                         ),

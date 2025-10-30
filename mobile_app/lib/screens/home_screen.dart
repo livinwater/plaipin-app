@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import '../theme/app_theme.dart';
+import '../utils/cartesia_test.dart';
 
 /// Home Screen
 /// Main screen with companion animation
@@ -18,6 +19,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => CartesiaTest.testCartesiaConnection(context),
+        backgroundColor: AppTheme.primaryPink,
+        icon: const Icon(Icons.volume_up),
+        label: const Text('Test Voice'),
+      ),
       body: Container(
         // Gradient background like Zepeto
         decoration: BoxDecoration(
