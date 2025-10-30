@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import '../models/journal_entry.dart';
 import '../theme/app_theme.dart';
@@ -15,7 +14,6 @@ class JournalScreen extends StatefulWidget {
 }
 
 class _JournalScreenState extends State<JournalScreen> {
-  CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   
@@ -123,273 +121,57 @@ class _JournalScreenState extends State<JournalScreen> {
   @override
   Widget build(BuildContext context) {
     final selectedEntries = _selectedDay != null ? _getEntriesForDay(_selectedDay!) : [];
+    final hasSelectedEntry = selectedEntries.isNotEmpty;
     
     return Scaffold(
-      backgroundColor: AppTheme.lightGray,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppTheme.pastelPink, AppTheme.pastelPurple],
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryPink.withOpacity(0.3),
-                              blurRadius: 10,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: const Center(
-                          child: Text('🎀', style: TextStyle(fontSize: 24)),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'PlaiPin\'s Diary',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              'Daily adventures & memories',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.darkGray,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.pastelPink,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${_entries.length} entries',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.primaryPink,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            
-            // Calendar
-            Card(
-              margin: const EdgeInsets.all(16),
-              child: TableCalendar(
-                firstDay: DateTime.utc(2024, 1, 1),
-                lastDay: DateTime.utc(2025, 12, 31),
-                focusedDay: _focusedDay,
-                calendarFormat: _calendarFormat,
-                selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                onDaySelected: (selectedDay, focusedDay) {
-                  setState(() {
-                    _selectedDay = selectedDay;
-                    _focusedDay = focusedDay;
-                  });
-                },
-                onFormatChanged: (format) {
-                  setState(() {
-                    _calendarFormat = format;
-                  });
-                },
-                onPageChanged: (focusedDay) {
-                  _focusedDay = focusedDay;
-                },
-                calendarStyle: CalendarStyle(
-                  todayDecoration: BoxDecoration(
-                    color: AppTheme.pastelPink,
-                    shape: BoxShape.circle,
-                  ),
-                  selectedDecoration: const BoxDecoration(
-                    color: AppTheme.primaryPink,
-                    shape: BoxShape.circle,
-                  ),
-                  markerDecoration: const BoxDecoration(
-                    color: AppTheme.primaryPurple,
-                    shape: BoxShape.circle,
-                  ),
-                  markersMaxCount: 1,
-                ),
-                headerStyle: HeaderStyle(
-                  formatButtonVisible: false,
-                  titleCentered: true,
-                  titleTextStyle: Theme.of(context).textTheme.titleLarge!.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                eventLoader: (day) {
-                  return _hasEntryForDay(day) ? ['entry'] : [];
-                },
-              ),
-            ),
-            
-            // Selected day's entries
-            Expanded(
-              child: selectedEntries.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: selectedEntries.length,
-                      itemBuilder: (context, index) {
-                        return _buildEntryCard(selectedEntries[index]);
-                      },
-                    ),
-            ),
-          ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppTheme.pastelPink.withOpacity(0.3),
+              AppTheme.pastelPurple.withOpacity(0.2),
+              AppTheme.white,
+            ],
+          ),
         ),
-      ),
-    );
-  }
-  
-  Widget _buildEntryCard(JournalEntry entry) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 3,
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => JournalEntryDetail(entry: entry),
-            ),
-          );
-        },
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
+        child: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  // Mood indicator
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Color(int.parse(entry.moodColor.replaceFirst('#', '0xFF'))).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      entry.moodEmoji,
-                      style: const TextStyle(fontSize: 24),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Feeling ${entry.mood}',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          DateFormat('h:mm a').format(entry.date),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.darkGray,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  // Audio indicator
-                  if (entry.hasAudio)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppTheme.pastelPurple,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.headphones, size: 14, color: AppTheme.primaryPurple),
-                          const SizedBox(width: 4),
-                          Text(
-                            entry.formattedDuration,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.primaryPurple,
-                            ),
-                          ),
-                        ],
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Journal',
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.black,
                       ),
                     ),
-                ],
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // Preview text
-              Text(
-                entry.entryText,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // Activities count
-              Row(
-                children: [
-                  const Icon(Icons.check_circle_outline, size: 16, color: AppTheme.primaryPurple),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${entry.activities.length} activities',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.darkGray,
+                    const SizedBox(height: 4),
+                    Text(
+                      DateFormat('MMM d, y').format(_focusedDay),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.darkGray,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Icon(Icons.stars, size: 16, color: AppTheme.moodHappy),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${entry.highlights.length} highlights',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.darkGray,
-                    ),
-                  ),
-                  const Spacer(),
-                  const Icon(Icons.arrow_forward_ios, size: 14, color: AppTheme.darkGray),
-                ],
+                  ],
+                ),
               ),
+              
+              // Custom Calendar Grid
+              Expanded(
+                child: _buildCustomCalendar(),
+              ),
+              
+              // Preview card when day is selected
+              if (hasSelectedEntry)
+                _buildPreviewCard(selectedEntries.first),
             ],
           ),
         ),
@@ -397,43 +179,209 @@ class _JournalScreenState extends State<JournalScreen> {
     );
   }
   
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32.0),
+  Widget _buildCustomCalendar() {
+    // Get first day of month and number of days
+    final firstDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month, 1);
+    final lastDayOfMonth = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
+    final daysInMonth = lastDayOfMonth.day;
+    final startWeekday = firstDayOfMonth.weekday % 7; // 0 = Sunday
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Column(
+        children: [
+          // Week day headers
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                  .map((day) => Expanded(
+                        child: Center(
+                          child: Text(
+                            day,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.darkGray,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ))
+                  .toList(),
+            ),
+          ),
+          
+          // Calendar grid
+          Expanded(
+            child: GridView.builder(
+              padding: EdgeInsets.zero,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                childAspectRatio: 0.7,
+                crossAxisSpacing: 4,
+                mainAxisSpacing: 4,
+              ),
+              itemCount: 42, // 6 weeks max
+              itemBuilder: (context, index) {
+                final dayNumber = index - startWeekday + 1;
+                
+                if (dayNumber < 1 || dayNumber > daysInMonth) {
+                  return const SizedBox.shrink();
+                }
+                
+                final date = DateTime(_focusedDay.year, _focusedDay.month, dayNumber);
+                final isToday = _isSameDay(date, DateTime.now());
+                final isSelected = _isSameDay(date, _selectedDay);
+                final hasEntry = _hasEntryForDay(date);
+                final entry = hasEntry ? _getEntriesForDay(date).first : null;
+                
+                return _buildDayCell(
+                  dayNumber,
+                  date,
+                  isToday: isToday,
+                  isSelected: isSelected,
+                  hasEntry: hasEntry,
+                  entry: entry,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildDayCell(
+    int day,
+    DateTime date, {
+    required bool isToday,
+    required bool isSelected,
+    required bool hasEntry,
+    JournalEntry? entry,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedDay = date;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
+            // Day number
+            Text(
+              '$day',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isSelected ? AppTheme.primaryPink : AppTheme.black,
+                fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 4),
+            
+            // Entry indicator box - always show, empty or with emoji
             Container(
-              width: 100,
-              height: 100,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: AppTheme.lightGray,
-                shape: BoxShape.circle,
+                color: hasEntry && entry != null
+                    ? Color(int.parse(entry.moodColor.replaceFirst('#', '0xFF')))
+                        .withOpacity(0.3)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isSelected
+                      ? AppTheme.primaryPink
+                      : hasEntry
+                          ? Colors.transparent
+                          : AppTheme.mediumGray.withOpacity(0.3),
+                  width: isSelected ? 2 : 1,
+                ),
               ),
-              child: const Icon(
-                Icons.auto_stories_outlined,
-                size: 50,
-                color: AppTheme.darkGray,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Entry Yet',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: AppTheme.darkGray,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'PlaiPin will write about this day\nwhen you have some activities!',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
+              child: hasEntry && entry != null
+                  ? Center(
+                      child: Text(
+                        entry.moodEmoji,
+                        style: const TextStyle(fontSize: 18),
+                      ),
+                    )
+                  : null,
             ),
           ],
         ),
       ),
     );
+  }
+  
+  Widget _buildPreviewCard(JournalEntry entry) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => JournalEntryDetail(entry: entry),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Mood emoji
+                Text(
+                  entry.moodEmoji,
+                  style: const TextStyle(fontSize: 28),
+                ),
+                const SizedBox(width: 12),
+                
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        DateFormat('EEEE, MMM d').format(entry.date),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.darkGray,
+                        ),
+                      ),
+                      Text(
+                        'Feeling ${entry.mood}',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Arrow indicator
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: AppTheme.primaryPink,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  
+  bool _isSameDay(DateTime? a, DateTime? b) {
+    if (a == null || b == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
 
