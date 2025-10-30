@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:pinenacl/x25519.dart' as nacl_x25519;
 import 'package:pinenacl/api.dart';
@@ -28,6 +29,11 @@ class WalletService extends ChangeNotifier {
   String? _session;
   nacl_x25519.PrivateKey? _encryptionPrivateKey;
   String? _dappPublicKey;
+  nacl_x25519.PublicKey? _phantomPublicKey; // Store Phantom's public key for encryption
+  
+  // Transaction signing state
+  Completer<String>? _signTransactionCompleter;
+  String? _pendingTransaction;
   
   // Getters
   WalletConnectionState get connectionState => _connectionState;
@@ -175,6 +181,9 @@ class WalletService extends ChangeNotifier {
       // Create Phantom's public key
       final phantomPublicKey = nacl_x25519.PublicKey(Uint8List.fromList(phantomPublicKeyBytes));
       
+      // Store Phantom's public key for later encryption (transaction signing)
+      _phantomPublicKey = phantomPublicKey;
+      
       // Create Box for NaCl box decryption
       final box = nacl_x25519.Box(
         myPrivateKey: _encryptionPrivateKey!,
@@ -236,6 +245,7 @@ class WalletService extends ChangeNotifier {
       _session = null;
       _encryptionPrivateKey = null;
       _dappPublicKey = null;
+      _phantomPublicKey = null;
       _connectionState = WalletConnectionState.disconnected;
       _errorMessage = null;
       
@@ -293,6 +303,201 @@ class WalletService extends ChangeNotifier {
     const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
     final random = DateTime.now().millisecondsSinceEpoch.toString();
     return '${chars[random.hashCode % chars.length]}' * 44;
+  }
+  
+  /// Sign a transaction using Phantom wallet
+  /// 
+  /// Opens Phantom app to sign the transaction via deep-link.
+  /// According to Phantom docs, the transaction must be encrypted in a payload.
+  /// Returns the signed transaction in base58 format.
+  Future<String> signTransaction(String transactionBase58) async {
+    try {
+      if (!isConnected) {
+        throw Exception('Wallet not connected');
+      }
+      
+      // Validate required parameters
+      if (_dappPublicKey == null || _dappPublicKey!.isEmpty) {
+        throw Exception('Dapp public key not initialized');
+      }
+      
+      if (_session == null || _session!.isEmpty) {
+        throw Exception('Session not established. Please reconnect wallet.');
+      }
+      
+      if (_encryptionPrivateKey == null) {
+        throw Exception('Encryption key not initialized');
+      }
+      
+      if (_phantomPublicKey == null) {
+        throw Exception('Phantom public key not available. Please reconnect wallet.');
+      }
+      
+      debugPrint('📝 Requesting transaction signature from Phantom...');
+      debugPrint('Transaction length: ${transactionBase58.length} chars (base58)');
+      debugPrint('Session: ${_session!.substring(0, 8)}...');
+      
+      // Create a completer to wait for the signed transaction
+      _signTransactionCompleter = Completer<String>();
+      _pendingTransaction = transactionBase58;
+      
+      // Step 1: Create payload with session and transaction
+      // According to Phantom docs: payload = { session, transaction }
+      final payload = jsonEncode({
+        'session': _session,
+        'transaction': transactionBase58,
+      });
+      
+      debugPrint('Payload created: ${payload.length} bytes');
+      
+      // Step 2: Encrypt the payload using NaCl box
+      final box = nacl_x25519.Box(
+        myPrivateKey: _encryptionPrivateKey!,
+        theirPublicKey: _phantomPublicKey!,
+      );
+      
+      final encryptedMessage = box.encrypt(utf8.encode(payload));
+      
+      debugPrint('Payload encrypted:');
+      debugPrint('  - Ciphertext: ${encryptedMessage.cipherText.length} bytes');
+      debugPrint('  - Nonce: ${encryptedMessage.nonce.length} bytes');
+      
+      // Step 3: Base58 encode the encrypted payload and nonce
+      final payloadBase58 = base58.encode(Uint8List.fromList(encryptedMessage.cipherText));
+      final nonceBase58 = base58.encode(Uint8List.fromList(encryptedMessage.nonce));
+      
+      // Step 4: Build Phantom sign transaction URL with encrypted payload
+      final redirectLink = '$redirectScheme://signed';
+      
+      final params = {
+        'dapp_encryption_public_key': _dappPublicKey!,
+        'nonce': nonceBase58,
+        'redirect_link': redirectLink,
+        'payload': payloadBase58,
+      };
+      
+      final queryString = params.entries
+          .map((e) => '${Uri.encodeComponent(e.key)}=${Uri.encodeComponent(e.value)}')
+          .join('&');
+      
+      final url = Uri.parse('https://phantom.app/ul/v1/signTransaction?$queryString');
+      
+      debugPrint('Launching Phantom for signing...');
+      debugPrint('URL length: ${url.toString().length} chars');
+      
+      if (await canLaunchUrl(url)) {
+        final launched = await launchUrl(
+          url,
+          mode: LaunchMode.externalApplication,
+        );
+        
+        if (!launched) {
+          throw Exception('Failed to launch Phantom wallet');
+        }
+        
+        debugPrint('⏳ Waiting for user to sign transaction in Phantom...');
+        
+        // Wait for the signed transaction (with timeout)
+        final signedTransaction = await _signTransactionCompleter!.future
+            .timeout(
+              const Duration(minutes: 5),
+              onTimeout: () => throw Exception('Transaction signing timeout'),
+            );
+        
+        debugPrint('✅ Transaction signed successfully');
+        return signedTransaction;
+      } else {
+        throw Exception('Could not launch Phantom wallet');
+      }
+    } catch (e) {
+      debugPrint('❌ Error signing transaction: $e');
+      _errorMessage = e.toString();
+      _signTransactionCompleter = null;
+      _pendingTransaction = null;
+      notifyListeners();
+      rethrow;
+    }
+  }
+  
+  /// Handle signed transaction response from Phantom
+  Future<void> handleSignedTransaction(Uri uri) async {
+    debugPrint('🔗 Handling signed transaction response');
+    debugPrint('URI: ${uri.toString()}');
+    
+    try {
+      final params = uri.queryParameters;
+      debugPrint('Query params: ${params.keys.join(", ")}');
+      
+      // Check for error
+      if (params.containsKey('errorCode')) {
+        final errorCode = params['errorCode'];
+        final errorMessage = params['errorMessage'] ?? 'Transaction signing failed';
+        debugPrint('❌ Phantom returned error:');
+        debugPrint('   Code: $errorCode');
+        debugPrint('   Message: $errorMessage');
+        
+        _signTransactionCompleter?.completeError(Exception(errorMessage));
+        _signTransactionCompleter = null;
+        _pendingTransaction = null;
+        return;
+      }
+      
+      // Extract and decrypt signed transaction
+      final dataBase58 = params['data'];
+      final nonceBase58 = params['nonce'];
+      
+      debugPrint('Received parameters:');
+      debugPrint('  - data: ${dataBase58 != null ? "present (${dataBase58.length} chars)" : "MISSING"}');
+      debugPrint('  - nonce: ${nonceBase58 != null ? "present" : "MISSING"}');
+      
+      if (dataBase58 == null || nonceBase58 == null) {
+        throw Exception('Missing signed transaction data from Phantom response');
+      }
+      
+      if (_encryptionPrivateKey == null || _phantomPublicKey == null) {
+        throw Exception('Encryption keys not available. Please reconnect wallet.');
+      }
+      
+      // Decode from base58
+      final encryptedData = base58.decode(dataBase58);
+      final nonceBytes = base58.decode(nonceBase58);
+      
+      // Create Box for NaCl box decryption using stored keys
+      final box = nacl_x25519.Box(
+        myPrivateKey: _encryptionPrivateKey!,
+        theirPublicKey: _phantomPublicKey!,
+      );
+      
+      // Decrypt the signed transaction
+      final decryptedBytes = box.decrypt(
+        EncryptedMessage(
+          cipherText: Uint8List.fromList(encryptedData),
+          nonce: Uint8List.fromList(nonceBytes),
+        ),
+      );
+      
+      final decryptedJson = utf8.decode(decryptedBytes);
+      debugPrint('✅ Decrypted signed transaction data');
+      
+      final responseData = jsonDecode(decryptedJson) as Map<String, dynamic>;
+      final signedTransaction = responseData['transaction'] as String?;
+      
+      if (signedTransaction == null) {
+        throw Exception('Missing signed transaction in response');
+      }
+      
+      // Complete the future with the signed transaction
+      _signTransactionCompleter?.complete(signedTransaction);
+      _signTransactionCompleter = null;
+      _pendingTransaction = null;
+      
+      debugPrint('✅ Signed transaction received and processed');
+    } catch (e) {
+      debugPrint('❌ Error processing signed transaction: $e');
+      _signTransactionCompleter?.completeError(e);
+      _signTransactionCompleter = null;
+      _pendingTransaction = null;
+    }
   }
   
   /// Clear error message

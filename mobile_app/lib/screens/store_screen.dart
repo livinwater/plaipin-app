@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../services/wallet_service.dart';
 import '../services/privy_wallet_service.dart';
+import '../services/nft_service.dart';
+import '../services/inventory_service.dart';
 import 'privy_login_screen.dart';
 
 /// Store Screen
@@ -201,50 +204,280 @@ class _StoreItemCard extends StatelessWidget {
   void _showItemDetails(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: item.gradientColors,
+      builder: (modalContext) => Consumer2<InventoryService, WalletService>(
+        builder: (context, inventoryService, walletService, _) {
+          final isOwned = inventoryService.isItemOwned(item.id);
+          final isConnected = walletService.isConnected;
+
+          return Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 24,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: item.gradientColors,
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(item.icon, size: 40, color: Colors.white),
                 ),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(item.icon, size: 40, color: Colors.white),
+                const SizedBox(height: 16),
+                Text(item.name, style: Theme.of(context).textTheme.headlineMedium),
+                const SizedBox(height: 8),
+                Text(
+                  item.description,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                
+                // Show different button based on state
+                SizedBox(
+                  width: double.infinity,
+                  child: isOwned
+                      ? ElevatedButton(
+                          onPressed: null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.pastelGreen,
+                          ),
+                          child: const Text('Already Owned'),
+                        )
+                      : !isConnected
+                          ? ElevatedButton.icon(
+                              onPressed: () {
+                                Navigator.pop(modalContext);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Please connect your wallet first!'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.account_balance_wallet),
+                              label: const Text('Connect Wallet to Buy'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                              ),
+                            )
+                          : ElevatedButton(
+                              onPressed: () => _handlePurchase(modalContext, item),
+                              child: Text('Buy for ◎${item.price.toStringAsFixed(2)} SOL'),
+                            ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(item.name, style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 8),
-            Text(
-              item.description,
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
+          );
+        },
+      ),
+    );
+  }
+  
+  /// Handle item purchase
+  Future<void> _handlePurchase(BuildContext modalContext, _StoreItem item) async {
+    final nftService = Provider.of<NFTService>(modalContext, listen: false);
+    final inventoryService = Provider.of<InventoryService>(modalContext, listen: false);
+    final walletService = Provider.of<WalletService>(modalContext, listen: false);
+    final privyService = Provider.of<PrivyWalletService>(modalContext, listen: false);
+
+    // Get the connected wallet address
+    final walletAddress = walletService.isConnected 
+        ? walletService.walletAddress 
+        : privyService.solanaAddress;
+
+    if (walletAddress == null) {
+      ScaffoldMessenger.of(modalContext).showSnackBar(
+        const SnackBar(
+          content: Text('Wallet not connected!'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Show loading dialog
+    showDialog(
+      context: modalContext,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Processing purchase...'),
+              ],
             ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: item.isOwned ? null : () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Purchase feature coming in Phase 4!')),
-                  );
-                },
-                child: Text(item.isOwned ? 'Already Owned' : 'Buy for ◎${item.price.toStringAsFixed(2)} SOL'),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
+
+    try {
+      // Check balance first
+      final balance = await nftService.getBalance(walletAddress);
+      debugPrint('💰 Wallet balance: $balance SOL');
+      
+      if (balance < item.price) {
+        Navigator.pop(modalContext); // Close loading dialog
+        Navigator.pop(modalContext); // Close item details modal
+        
+        ScaffoldMessenger.of(modalContext).showSnackBar(
+          SnackBar(
+            content: Text('Insufficient balance! Need ◎${item.price.toStringAsFixed(2)} SOL but have ◎${balance.toStringAsFixed(4)} SOL'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+
+      // Phase 3: Create actual blockchain transaction
+      debugPrint('🔨 Creating blockchain transaction...');
+      final transactionBase58 = await nftService.createPurchaseTransaction(
+        buyerAddress: walletAddress,
+        priceInSol: item.price,
+        itemId: item.id,
+        itemName: item.name,
+      );
+
+      String? txSignature;
+      String? signedTransaction;
+      
+      // Debug wallet connection status
+      debugPrint('🔍 Wallet Status Check:');
+      debugPrint('  - Phantom connected: ${walletService.isConnected}');
+      debugPrint('  - Privy authenticated: ${privyService.isAuthenticated}');
+      debugPrint('  - Wallet address: $walletAddress');
+      
+      // Sign the transaction based on wallet type
+      if (walletService.isConnected) {
+        // Phantom wallet - sign via deep-link
+        debugPrint('📝 Signing transaction with Phantom...');
+        
+        try {
+          signedTransaction = await walletService.signTransaction(transactionBase58);
+          debugPrint('✅ Transaction signed by Phantom');
+        } catch (e) {
+          Navigator.pop(modalContext); // Close loading dialog
+          Navigator.pop(modalContext); // Close item details modal
+          
+          ScaffoldMessenger.of(modalContext).showSnackBar(
+            SnackBar(
+              content: Text('Transaction signing failed: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          return;
+        }
+      } else if (privyService.isAuthenticated) {
+        // Privy wallet - sign via embedded wallet
+        debugPrint('📝 Signing transaction with Privy...');
+        
+        try {
+          signedTransaction = await privyService.signTransaction(transactionBase58);
+          debugPrint('✅ Transaction signed by Privy');
+        } catch (e) {
+          Navigator.pop(modalContext); // Close loading dialog
+          Navigator.pop(modalContext); // Close item details modal
+          
+          ScaffoldMessenger.of(modalContext).showSnackBar(
+            SnackBar(
+              content: Text('Privy signing failed: $e'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+          return;
+        }
+      } else {
+        // No wallet connected - this shouldn't happen
+        Navigator.pop(modalContext); // Close loading dialog
+        Navigator.pop(modalContext); // Close item details modal
+        
+        ScaffoldMessenger.of(modalContext).showSnackBar(
+          const SnackBar(
+            content: Text('❌ No wallet connected! Please connect a wallet first.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+      
+      // Submit signed transaction to blockchain
+      debugPrint('📡 Submitting signed transaction to blockchain...');
+      debugPrint('  - Transaction length: ${signedTransaction!.length} chars');
+      
+      try {
+        txSignature = await nftService.submitTransaction(signedTransaction!);
+        debugPrint('✅ Transaction confirmed: $txSignature');
+      } catch (e) {
+        Navigator.pop(modalContext); // Close loading dialog
+        Navigator.pop(modalContext); // Close item details modal
+        
+        ScaffoldMessenger.of(modalContext).showSnackBar(
+          SnackBar(
+            content: Text('Transaction failed: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        return;
+      }
+
+      // Mint the NFT (record the purchase)
+      final nft = await nftService.mintItemNFT(
+        itemId: item.id,
+        itemName: item.name,
+        category: item.category,
+        description: item.description,
+        ownerAddress: walletAddress,
+        transactionSignature: txSignature,
+      );
+
+      // Add to inventory
+      await inventoryService.addItem(nft);
+
+      Navigator.pop(modalContext); // Close loading dialog
+      Navigator.pop(modalContext); // Close item details modal
+
+      // Show success message
+      ScaffoldMessenger.of(modalContext).showSnackBar(
+        SnackBar(
+          content: Text('✅ Successfully purchased ${item.name}!\nTx: ${txSignature?.substring(0, 8)}...'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      Navigator.pop(modalContext); // Close loading dialog
+      Navigator.pop(modalContext); // Close item details modal
+      
+      ScaffoldMessenger.of(modalContext).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 }
 
@@ -272,7 +505,7 @@ class _StoreItem {
 }
 
 final List<_StoreItem> _hardcodedItems = [
-  // Outfits
+  // Accessories - Part 1
   _StoreItem(
     id: '1',
     name: 'Yellow Ribbon',
@@ -281,7 +514,6 @@ final List<_StoreItem> _hardcodedItems = [
     category: 'Accessories',
     icon: Icons.checkroom,
     gradientColors: [AppTheme.pastelBlue, AppTheme.pastelPurple],
-    isOwned: true,
   ),
   _StoreItem(
     id: '2',
@@ -311,7 +543,7 @@ final List<_StoreItem> _hardcodedItems = [
     gradientColors: [AppTheme.moodExcited, AppTheme.moodHappy],
   ),
   
-  // Accessories
+  // Accessories - Part 2
   _StoreItem(
     id: '5',
     name: 'Little Spinner Hat',
@@ -320,7 +552,6 @@ final List<_StoreItem> _hardcodedItems = [
     category: 'Accessories',
     icon: Icons.visibility,
     gradientColors: [AppTheme.darkGray, AppTheme.black],
-    isOwned: true,
   ),
   _StoreItem(
     id: '6',
@@ -368,7 +599,6 @@ final List<_StoreItem> _hardcodedItems = [
     category: 'Backgrounds',
     icon: Icons.location_city,
     gradientColors: [AppTheme.primaryPurple, AppTheme.primaryPink],
-    isOwned: true,
   ),
   _StoreItem(
     id: '11',

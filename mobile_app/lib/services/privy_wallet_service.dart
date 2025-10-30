@@ -253,6 +253,44 @@ class PrivyWalletService extends ChangeNotifier {
     }
   }
   
+  /// Sign a Solana transaction using the embedded wallet
+  /// Note: Privy Flutter SDK v0.4.0 has limited transaction signing support
+  /// This is a placeholder for future SDK versions
+  Future<String> signTransaction(String unsignedTransactionBase58) async {
+    if (_currentUser == null || _currentUser!.embeddedSolanaWallets.isEmpty) {
+      throw Exception('No Solana wallet available. Please create a wallet first.');
+    }
+    
+    if (_privy == null) {
+      throw Exception('Privy SDK not initialized');
+    }
+    
+    try {
+      debugPrint('📝 Privy transaction signing requested...');
+      debugPrint('   Transaction length: ${unsignedTransactionBase58.length} chars');
+      debugPrint('   Wallet: ${getShortenedAddress()}');
+      
+      // TODO: Privy Flutter SDK v0.4.0 does not yet support direct transaction signing
+      // The Privy team is working on this feature for future releases
+      // For now, we acknowledge this limitation
+      
+      debugPrint('⚠️ Privy Flutter SDK does not yet support transaction signing');
+      debugPrint('   Privy is best suited for wallet creation and management');
+      debugPrint('   For transaction signing on mobile, use Phantom wallet instead');
+      
+      throw Exception(
+        'Privy Flutter SDK does not yet support transaction signing. '
+        'Please use Phantom wallet for signing transactions on devnet. '
+        'Privy is great for wallet creation, but signing requires Phantom or server-side signing.'
+      );
+    } catch (e) {
+      debugPrint('❌ Privy signing not available: $e');
+      _errorMessage = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+  
   /// Get shortened Solana address for display
   String getShortenedAddress() {
     final address = solanaAddress;

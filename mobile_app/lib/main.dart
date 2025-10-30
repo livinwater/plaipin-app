@@ -11,6 +11,8 @@ import 'screens/journal_screen.dart';
 import 'screens/device_screen.dart';
 import 'services/wallet_service.dart';
 import 'services/privy_wallet_service.dart';
+import 'services/nft_service.dart';
+import 'services/inventory_service.dart';
 // Note: mood_screen.dart is available but currently not in main navigation
 // Can be added as a 6th tab or integrated into journal screen in Phase 4
 
@@ -30,6 +32,8 @@ class CompanionApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => WalletService()),
         ChangeNotifierProvider(create: (_) => PrivyWalletService()),
+        ChangeNotifierProvider(create: (_) => NFTService()),
+        ChangeNotifierProvider(create: (_) => InventoryService()),
       ],
       child: MaterialApp(
         title: 'Mobile Companion',
@@ -99,9 +103,10 @@ class _MainNavigationState extends State<MainNavigation> {
   void _handleDeepLink(Uri uri) {
     debugPrint('Received deep link: $uri');
 
+    final walletService = Provider.of<WalletService>(context, listen: false);
+
     // Check if this is a wallet connection redirect
     if (uri.scheme == 'companion' && uri.host == 'connected') {
-      final walletService = Provider.of<WalletService>(context, listen: false);
       walletService.handleDeepLink(uri);
 
       // Navigate to Store screen to show connected wallet
@@ -117,6 +122,13 @@ class _MainNavigationState extends State<MainNavigation> {
           duration: Duration(seconds: 2),
         ),
       );
+    }
+    // Check if this is a signed transaction redirect
+    else if (uri.scheme == 'companion' && uri.host == 'signed') {
+      walletService.handleSignedTransaction(uri);
+      
+      debugPrint('✅ Signed transaction callback received');
+      // No UI feedback needed - the purchase flow will handle it
     }
   }
 

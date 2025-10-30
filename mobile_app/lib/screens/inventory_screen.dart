@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../services/inventory_service.dart';
+import '../services/nft_service.dart';
 
 /// Inventory Screen
-/// View and equip owned items (hardcoded for Phase 2)
+/// View and equip owned items
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
 
@@ -12,34 +15,46 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen> {
   String _selectedCategory = 'All';
-  final List<String> _categories = ['All', 'Outfits', 'Accessories', 'Backgrounds'];
-  
-  // Mock equipped items state (Phase 2 - local only)
-  final Map<String, String> _equippedItems = {
-    'Outfits': '1',
-    'Accessories': '5',
-    'Backgrounds': '10',
-  };
+  final List<String> _categories = ['All', 'Mini-apps', 'Accessories', 'Backgrounds'];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            // Item count
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    '${_ownedItems.length} items',
-                    style: Theme.of(context).textTheme.bodyMedium,
+        child: Consumer<InventoryService>(
+          builder: (context, inventoryService, _) {
+            final ownedItems = inventoryService.ownedItems;
+            final equippedItems = inventoryService.equippedItems;
+
+            return Column(
+              children: [
+                // Item count and Clear button
+                Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Clear button (left side)
+                      if (ownedItems.isNotEmpty)
+                        TextButton.icon(
+                          onPressed: () => _showClearInventoryDialog(context, inventoryService),
+                          icon: const Icon(Icons.delete_outline, size: 16),
+                          label: const Text('Clear All'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
+                        )
+                      else
+                        const SizedBox.shrink(),
+                      
+                      // Item count (right side)
+                      Text(
+                        '${ownedItems.length} items',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
             
             // Currently Equipped Section
             Padding(
@@ -58,11 +73,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     height: 100,
                     child: Row(
                       children: [
-                        _buildEquippedSlot('Outfits', Icons.checkroom),
+                        _buildEquippedSlot(inventoryService, 'Mini-apps', Icons.apps),
                         const SizedBox(width: 12),
-                        _buildEquippedSlot('Accessories', Icons.visibility),
+                        _buildEquippedSlot(inventoryService, 'Accessories', Icons.visibility),
                         const SizedBox(width: 12),
-                        _buildEquippedSlot('Backgrounds', Icons.landscape),
+                        _buildEquippedSlot(inventoryService, 'Backgrounds', Icons.landscape),
                       ],
                     ),
                   ),
@@ -107,46 +122,45 @@ class _InventoryScreenState extends State<InventoryScreen> {
             const SizedBox(height: 16),
             
             // Items Grid
-            Expanded(
-              child: _getFilteredItems().isEmpty
-                  ? _buildEmptyState()
-                  : GridView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 0.85,
-                      ),
-                      itemCount: _getFilteredItems().length,
-                      itemBuilder: (context, index) {
-                        final item = _getFilteredItems()[index];
-                        final isEquipped = _equippedItems[item.category] == item.id;
-                        return _InventoryItemCard(
-                          item: item,
-                          isEquipped: isEquipped,
-                          onTap: () => _onItemTap(item, isEquipped),
-                        );
-                      },
-                    ),
-            ),
-          ],
+                Expanded(
+                  child: _getFilteredItems(ownedItems).isEmpty
+                      ? _buildEmptyState()
+                      : GridView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 0.85,
+                          ),
+                          itemCount: _getFilteredItems(ownedItems).length,
+                          itemBuilder: (context, index) {
+                            final item = _getFilteredItems(ownedItems)[index];
+                            final isEquipped = equippedItems[item.category] == item.id;
+                            return _InventoryItemCard(
+                              item: item,
+                              isEquipped: isEquipped,
+                              onTap: () => _onItemTap(inventoryService, item, isEquipped),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
   
-  Widget _buildEquippedSlot(String category, IconData defaultIcon) {
-    final equippedItemId = _equippedItems[category];
-    final equippedItem = equippedItemId != null
-        ? _ownedItems.firstWhere((item) => item.id == equippedItemId)
-        : null;
+  Widget _buildEquippedSlot(InventoryService inventoryService, String category, IconData defaultIcon) {
+    final equippedItem = inventoryService.getEquippedItem(category);
     
     return Expanded(
       child: Container(
         decoration: BoxDecoration(
           gradient: equippedItem != null
-              ? LinearGradient(colors: equippedItem.gradientColors)
+              ? LinearGradient(colors: [AppTheme.primaryPink, AppTheme.primaryPurple])
               : LinearGradient(colors: [AppTheme.lightGray, AppTheme.mediumGray]),
           borderRadius: BorderRadius.circular(15),
           border: Border.all(
@@ -158,18 +172,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              equippedItem?.icon ?? defaultIcon,
+              defaultIcon,
               color: Colors.white,
               size: 32,
             ),
             const SizedBox(height: 4),
             Text(
-              category,
+              equippedItem?.name ?? category,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
               ),
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -204,40 +221,79 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
   
-  List<_InventoryItem> _getFilteredItems() {
+  List<ItemNFT> _getFilteredItems(List<ItemNFT> ownedItems) {
     if (_selectedCategory == 'All') {
-      return _ownedItems;
+      return ownedItems;
     }
-    return _ownedItems.where((item) => item.category == _selectedCategory).toList();
+    return ownedItems.where((item) => item.category == _selectedCategory).toList();
   }
   
-  void _onItemTap(_InventoryItem item, bool isEquipped) {
-    setState(() {
-      if (isEquipped) {
-        // Unequip
-        _equippedItems.remove(item.category);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unequipped ${item.name}'),
-            duration: const Duration(seconds: 1),
+  void _onItemTap(InventoryService inventoryService, ItemNFT item, bool isEquipped) {
+    if (isEquipped) {
+      // Unequip
+      inventoryService.unequipItem(item.category);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unequipped ${item.name}'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    } else {
+      // Equip
+      inventoryService.equipItem(item.id, item.category);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Equipped ${item.name}'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+  
+  /// Show confirmation dialog before clearing inventory
+  Future<void> _showClearInventoryDialog(BuildContext context, InventoryService inventoryService) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Inventory?'),
+        content: const Text(
+          'This will remove all items from your inventory and unequip everything.\n\n'
+          'This cannot be undone!',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
-        );
-      } else {
-        // Equip
-        _equippedItems[item.category] = item.id;
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm == true && context.mounted) {
+      await inventoryService.clearInventory();
+      
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Equipped ${item.name}'),
-            duration: const Duration(seconds: 1),
+          const SnackBar(
+            content: Text('🗑️ Inventory cleared successfully'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 2),
           ),
         );
       }
-    });
+    }
   }
 }
 
 class _InventoryItemCard extends StatelessWidget {
-  final _InventoryItem item;
+  final ItemNFT item;
   final bool isEquipped;
   final VoidCallback onTap;
   
@@ -246,6 +302,32 @@ class _InventoryItemCard extends StatelessWidget {
     required this.isEquipped,
     required this.onTap,
   });
+
+  IconData _getCategoryIcon() {
+    switch (item.category) {
+      case 'Mini-apps':
+        return Icons.apps;
+      case 'Accessories':
+        return Icons.checkroom;
+      case 'Backgrounds':
+        return Icons.landscape;
+      default:
+        return Icons.star;
+    }
+  }
+
+  List<Color> _getCategoryGradient() {
+    switch (item.category) {
+      case 'Mini-apps':
+        return [AppTheme.primaryPurple, AppTheme.primaryBlue];
+      case 'Accessories':
+        return [AppTheme.pastelBlue, AppTheme.pastelPurple];
+      case 'Backgrounds':
+        return [AppTheme.primaryPink, AppTheme.pastelPink];
+      default:
+        return [AppTheme.pastelGreen, AppTheme.pastelBlue];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -270,13 +352,13 @@ class _InventoryItemCard extends StatelessWidget {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: item.gradientColors,
+                        colors: _getCategoryGradient(),
                       ),
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
                     ),
                     child: Center(
                       child: Icon(
-                        item.icon,
+                        _getCategoryIcon(),
                         size: 40,
                         color: Colors.white,
                       ),
@@ -322,46 +404,4 @@ class _InventoryItemCard extends StatelessWidget {
     );
   }
 }
-
-// Hardcoded owned items for Phase 2 (subset of store items that are marked as owned)
-class _InventoryItem {
-  final String id;
-  final String name;
-  final String category;
-  final IconData icon;
-  final List<Color> gradientColors;
-
-  _InventoryItem({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.icon,
-    required this.gradientColors,
-  });
-}
-
-final List<_InventoryItem> _ownedItems = [
-  _InventoryItem(
-    id: '1',
-    name: 'Ribbon',
-    category: 'Outfits',
-    icon: Icons.checkroom,
-    gradientColors: [AppTheme.pastelBlue, AppTheme.pastelPurple],
-  ),
-  _InventoryItem(
-    id: '5',
-    name: 'Cool Glasses',
-    category: 'Accessories',
-    icon: Icons.visibility,
-    gradientColors: [AppTheme.darkGray, AppTheme.black],
-  ),
-  _InventoryItem(
-    id: '10',
-    name: 'City Skyline',
-    category: 'Backgrounds',
-    icon: Icons.location_city,
-    gradientColors: [AppTheme.primaryPurple, AppTheme.primaryPink],
-  ),
-  // Player starts with these 3 default items
-];
 
