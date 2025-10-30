@@ -270,9 +270,9 @@ class NFTService extends ChangeNotifier {
             throw Exception('Transaction failed: ${txStatus.err}');
           }
           
-          // Check for confirmation
-          if (txStatus.confirmationStatus == 'confirmed' || 
-              txStatus.confirmationStatus == 'finalized') {
+          // Check for confirmation (compare enum values, not strings)
+          if (txStatus.confirmationStatus == Commitment.confirmed || 
+              txStatus.confirmationStatus == Commitment.finalized) {
             debugPrint('✅ Transaction confirmed!');
             return;
           }

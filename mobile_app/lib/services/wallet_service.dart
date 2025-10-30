@@ -316,6 +316,11 @@ class WalletService extends ChangeNotifier {
         throw Exception('Wallet not connected');
       }
       
+      // Check if there's already a pending transaction
+      if (_signTransactionCompleter != null && !_signTransactionCompleter!.isCompleted) {
+        throw Exception('A transaction is already pending. Please wait.');
+      }
+      
       // Validate required parameters
       if (_dappPublicKey == null || _dappPublicKey!.isEmpty) {
         throw Exception('Dapp public key not initialized');
