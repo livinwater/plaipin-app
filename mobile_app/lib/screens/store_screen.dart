@@ -450,6 +450,9 @@ class _StoreItemCard extends StatelessWidget {
         description: item.description,
         ownerAddress: walletAddress,
         transactionSignature: txSignature,
+        attachmentPoint: item.attachmentPoint,
+        position: item.position,
+        modelPath: item.modelPath,
       );
 
       // Add to inventory
@@ -491,6 +494,11 @@ class _StoreItem {
   final IconData icon;
   final List<Color> gradientColors;
   final bool isOwned;
+  
+  // Accessory positioning data
+  final AttachmentPoint? attachmentPoint;
+  final AccessoryPosition? position;
+  final String? modelPath;
 
   _StoreItem({
     required this.id,
@@ -501,6 +509,9 @@ class _StoreItem {
     required this.icon,
     required this.gradientColors,
     this.isOwned = false,
+    this.attachmentPoint,
+    this.position,
+    this.modelPath,
   });
 }
 
@@ -514,6 +525,9 @@ final List<_StoreItem> _hardcodedItems = [
     category: 'Accessories',
     icon: Icons.checkroom,
     gradientColors: [AppTheme.pastelBlue, AppTheme.pastelPurple],
+    attachmentPoint: AttachmentPoint.ears,
+    position: const AccessoryPosition(y: 0.2, scale: 0.8),
+    modelPath: 'assets/models/yellow_ribbon.glb',
   ),
   _StoreItem(
     id: '2',
@@ -523,6 +537,8 @@ final List<_StoreItem> _hardcodedItems = [
     category: 'Accessories',
     icon: Icons.celebration,
     gradientColors: [AppTheme.primaryPink, AppTheme.primaryPurple],
+    attachmentPoint: AttachmentPoint.neck,
+    position: const AccessoryPosition(y: -0.1, scale: 1.0),
   ),
   _StoreItem(
     id: '3',
@@ -532,6 +548,8 @@ final List<_StoreItem> _hardcodedItems = [
     category: 'Accessories',
     icon: Icons.hot_tub,
     gradientColors: [AppTheme.pastelGreen, AppTheme.pastelBlue],
+    attachmentPoint: AttachmentPoint.head,
+    position: const AccessoryPosition(y: 0.3, scale: 1.1),
   ),
   _StoreItem(
     id: '4',
@@ -541,6 +559,8 @@ final List<_StoreItem> _hardcodedItems = [
     category: 'Accessories',
     icon: Icons.sports_soccer,
     gradientColors: [AppTheme.moodExcited, AppTheme.moodHappy],
+    attachmentPoint: AttachmentPoint.ears,
+    position: const AccessoryPosition(x: 0.15, scale: 0.6),
   ),
   
   // Accessories - Part 2
@@ -552,6 +572,8 @@ final List<_StoreItem> _hardcodedItems = [
     category: 'Accessories',
     icon: Icons.visibility,
     gradientColors: [AppTheme.darkGray, AppTheme.black],
+    attachmentPoint: AttachmentPoint.head,
+    position: const AccessoryPosition(y: 0.4, scale: 1.0),
   ),
   _StoreItem(
     id: '6',
@@ -561,6 +583,8 @@ final List<_StoreItem> _hardcodedItems = [
     category: 'Accessories',
     icon: Icons.emoji_emotions,
     gradientColors: [AppTheme.pastelYellow, AppTheme.pastelPink],
+    attachmentPoint: AttachmentPoint.eyes,
+    position: const AccessoryPosition(y: 0.05, z: 0.1, scale: 0.9),
   ),
   _StoreItem(
     id: '7',
@@ -570,6 +594,8 @@ final List<_StoreItem> _hardcodedItems = [
     category: 'Accessories',
     icon: Icons.dashboard_customize,
     gradientColors: [AppTheme.primaryPurple, AppTheme.primaryBlue],
+    attachmentPoint: AttachmentPoint.neck,
+    position: const AccessoryPosition(y: -0.05, z: 0.1, scale: 0.7),
   ),
   _StoreItem(
     id: '8',
@@ -579,6 +605,8 @@ final List<_StoreItem> _hardcodedItems = [
     category: 'Accessories',
     icon: Icons.headphones,
     gradientColors: [AppTheme.primaryBlue, AppTheme.pastelBlue],
+    attachmentPoint: AttachmentPoint.head,
+    position: const AccessoryPosition(y: 0.1, scale: 1.2),
   ),
   
   // Backgrounds

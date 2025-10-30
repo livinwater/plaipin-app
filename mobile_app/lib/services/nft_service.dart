@@ -7,6 +7,49 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:bs58/bs58.dart';
 
+/// Accessory attachment points on the character model
+enum AttachmentPoint {
+  head,      // Top of head (hats, crowns)
+  ears,      // Ears (ribbons, earrings)
+  eyes,      // Eyes/face (glasses)
+  neck,      // Neck area (scarves, necklaces)
+  body,      // Body/torso (shirts, vests)
+  none,      // No specific attachment (backgrounds, mini-apps)
+}
+
+/// Position offset for accessories (relative to attachment point)
+class AccessoryPosition {
+  final double x;
+  final double y;
+  final double z;
+  final double scale;
+  final double rotation; // degrees
+  
+  const AccessoryPosition({
+    this.x = 0,
+    this.y = 0,
+    this.z = 0,
+    this.scale = 1.0,
+    this.rotation = 0,
+  });
+  
+  Map<String, dynamic> toJson() => {
+    'x': x,
+    'y': y,
+    'z': z,
+    'scale': scale,
+    'rotation': rotation,
+  };
+  
+  factory AccessoryPosition.fromJson(Map<String, dynamic> json) => AccessoryPosition(
+    x: json['x'] ?? 0,
+    y: json['y'] ?? 0,
+    z: json['z'] ?? 0,
+    scale: json['scale'] ?? 1.0,
+    rotation: json['rotation'] ?? 0,
+  );
+}
+
 /// NFT/Item Metadata
 class ItemNFT {
   final String id;
@@ -15,6 +58,11 @@ class ItemNFT {
   final String description;
   final String? mintAddress;
   final DateTime purchaseDate;
+  
+  // Accessory-specific metadata
+  final AttachmentPoint? attachmentPoint;
+  final AccessoryPosition? position;
+  final String? modelPath; // Path to 3D model for the accessory (if exists)
 
   ItemNFT({
     required this.id,
@@ -23,6 +71,9 @@ class ItemNFT {
     required this.description,
     this.mintAddress,
     required this.purchaseDate,
+    this.attachmentPoint,
+    this.position,
+    this.modelPath,
   });
 
   Map<String, dynamic> toJson() => {
@@ -32,6 +83,9 @@ class ItemNFT {
         'description': description,
         'mintAddress': mintAddress,
         'purchaseDate': purchaseDate.toIso8601String(),
+        'attachmentPoint': attachmentPoint?.name,
+        'position': position?.toJson(),
+        'modelPath': modelPath,
       };
 
   factory ItemNFT.fromJson(Map<String, dynamic> json) => ItemNFT(
@@ -41,6 +95,13 @@ class ItemNFT {
         description: json['description'],
         mintAddress: json['mintAddress'],
         purchaseDate: DateTime.parse(json['purchaseDate']),
+        attachmentPoint: json['attachmentPoint'] != null 
+            ? AttachmentPoint.values.firstWhere((e) => e.name == json['attachmentPoint'])
+            : null,
+        position: json['position'] != null 
+            ? AccessoryPosition.fromJson(json['position'])
+            : null,
+        modelPath: json['modelPath'],
       );
 }
 
@@ -308,11 +369,17 @@ class NFTService extends ChangeNotifier {
     required String description,
     required String ownerAddress,
     String? transactionSignature,
+    AttachmentPoint? attachmentPoint,
+    AccessoryPosition? position,
+    String? modelPath,
   }) async {
     try {
       debugPrint('🎨 Recording NFT mint for: $itemName');
       debugPrint('Owner: $ownerAddress');
       debugPrint('Transaction: $transactionSignature');
+      if (attachmentPoint != null) {
+        debugPrint('Attachment Point: ${attachmentPoint.name}');
+      }
 
       // Create NFT record
       // In production, this would query the actual NFT mint address from the blockchain
@@ -323,6 +390,9 @@ class NFTService extends ChangeNotifier {
         description: description,
         mintAddress: transactionSignature, // Using tx signature as identifier for now
         purchaseDate: DateTime.now(),
+        attachmentPoint: attachmentPoint,
+        position: position,
+        modelPath: modelPath,
       );
 
       debugPrint('✅ NFT recorded successfully');
