@@ -74,26 +74,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           
                           // Equipped Accessories Overlay
                           ..._buildAccessoryOverlays(inventoryService),
-                          
-                          // Debug indicator
-                          Positioned(
-                            bottom: 10,
-                            right: 10,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.black54,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '3D Model | ${equippedAccessories.length} accessories',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                     );
