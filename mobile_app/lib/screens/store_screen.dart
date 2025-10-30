@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:model_viewer_plus/model_viewer_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/wallet_service.dart';
 import '../services/privy_wallet_service.dart';
@@ -133,11 +134,26 @@ class _StoreItemCard extends StatelessWidget {
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 child: Center(
-                  child: Icon(
-                    item.icon,
-                    size: 60,
-                    color: Colors.white,
-                  ),
+                  child: item.modelPath != null && item.modelPath!.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                          child: ModelViewer(
+                            src: item.modelPath!,
+                            alt: item.name,
+                            autoRotate: true,
+                            autoRotateDelay: 0,
+                            cameraControls: false,
+                            touchAction: TouchAction.none,
+                            interactionPrompt: InteractionPrompt.none,
+                            loading: Loading.eager,
+                            ar: false,
+                          ),
+                        )
+                      : Icon(
+                          item.icon,
+                          size: 60,
+                          color: Colors.white,
+                        ),
                 ),
               ),
             ),

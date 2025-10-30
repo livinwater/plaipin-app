@@ -222,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case AttachmentPoint.head:
         return const Offset(180, 60);  // Top of head
       case AttachmentPoint.ears:
-        return const Offset(150, 80);  // Ear area (left side)
+        return const Offset(240, 90);  // Ear area (right side)
       case AttachmentPoint.eyes:
         return const Offset(185, 100); // Eye/face area
       case AttachmentPoint.neck:

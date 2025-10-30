@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:model_viewer_plus/model_viewer_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/inventory_service.dart';
 import '../services/nft_service.dart';
@@ -357,11 +358,26 @@ class _InventoryItemCard extends StatelessWidget {
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
                     ),
                     child: Center(
-                      child: Icon(
-                        _getCategoryIcon(),
-                        size: 40,
-                        color: Colors.white,
-                      ),
+                      child: item.modelPath != null && item.modelPath!.isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                              child: ModelViewer(
+                                src: item.modelPath!,
+                                alt: item.name,
+                                autoRotate: true,
+                                autoRotateDelay: 0,
+                                cameraControls: false,
+                                touchAction: TouchAction.none,
+                                interactionPrompt: InteractionPrompt.none,
+                                loading: Loading.eager,
+                                ar: false,
+                              ),
+                            )
+                          : Icon(
+                              _getCategoryIcon(),
+                              size: 40,
+                              color: Colors.white,
+                            ),
                     ),
                   ),
                 ),
