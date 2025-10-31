@@ -580,7 +580,7 @@ class NFTService extends ChangeNotifier {
           AccountMeta.writeable(pubKey: ownerPubkey, isSigner: true),
           AccountMeta.readonly(pubKey: systemProgramId, isSigner: false),
         ],
-        data: instructionData.toBytes().toList(),
+        data: ByteArray(instructionData.toBytes()),
       );
 
       // Build transaction

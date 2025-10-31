@@ -263,7 +263,7 @@ class _StoreItemCard extends StatelessWidget {
                 // Show different button based on state
                 SizedBox(
                   width: double.infinity,
-                  child: isOwned && item.id != '1' // Yellow Ribbon (id '1') can be bought multiple times
+                  child: isOwned
                       ? ElevatedButton(
                           onPressed: null,
                           style: ElevatedButton.styleFrom(
@@ -290,9 +290,7 @@ class _StoreItemCard extends StatelessWidget {
                             )
                           : ElevatedButton(
                               onPressed: () => _handlePurchase(modalContext, item),
-                              child: Text(item.id == '1' && isOwned 
-                                ? 'Buy Another for ◎${item.price.toStringAsFixed(2)} SOL'
-                                : 'Buy for ◎${item.price.toStringAsFixed(2)} SOL'),
+                              child: Text('Buy for ◎${item.price.toStringAsFixed(2)} SOL'),
                             ),
                 ),
               ],
@@ -368,18 +366,13 @@ class _StoreItemCard extends StatelessWidget {
       // Phase 3: Create actual blockchain transaction
       debugPrint('🔨 Creating blockchain transaction...');
       
-      // Check if this is Yellow Ribbon - use smart contract mint
-      final transactionBase58 = item.id == '1' 
-        ? await nftService.createMintYellowRibbonTransaction(
-            ownerAddress: walletAddress,
-            ribbonName: 'My Yellow Ribbon',
-          )
-        : await nftService.createPurchaseTransaction(
-            buyerAddress: walletAddress,
-            priceInSol: item.price,
-            itemId: item.id,
-            itemName: item.name,
-          );
+      // Use regular payment transaction for all items
+      final transactionBase58 = await nftService.createPurchaseTransaction(
+        buyerAddress: walletAddress,
+        priceInSol: item.price,
+        itemId: item.id,
+        itemName: item.name,
+      );
 
       String? txSignature;
       String? signedTransaction;
@@ -487,12 +480,9 @@ class _StoreItemCard extends StatelessWidget {
       Navigator.pop(modalContext); // Close item details modal
 
       // Show success message
-      final isYellowRibbon = item.id == '1';
       ScaffoldMessenger.of(modalContext).showSnackBar(
         SnackBar(
-          content: Text(isYellowRibbon 
-            ? '🎀 Yellow Ribbon minted on-chain!\nTx: ${txSignature?.substring(0, 8)}...\nCheck your inventory!'
-            : '✅ Successfully purchased ${item.name}!\nTx: ${txSignature?.substring(0, 8)}...'),
+          content: Text('✅ Successfully purchased ${item.name}!\nTx: ${txSignature?.substring(0, 8)}...'),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 4),
         ),
@@ -548,7 +538,7 @@ final List<_StoreItem> _hardcodedItems = [
   _StoreItem(
     id: '1',
     name: 'Yellow Ribbon',
-    description: 'Cutest ribbon for Plaipin! Collect multiple 🎀',
+    description: 'Cutest ribbon for Plaipin',
     price: 0.01,
     category: 'Accessories',
     icon: Icons.checkroom,
