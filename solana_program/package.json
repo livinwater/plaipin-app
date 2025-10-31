@@ -1,10 +1,16 @@
 {
     "scripts": {
         "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
-        "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
+        "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
+        "deploy:accessory": "./deploy_accessory_nft.sh",
+        "test:accessory": "anchor test --provider.cluster devnet -- --grep \"Accessory\"",
+        "upload:metadata": "ts-node scripts/upload_metadata.ts"
     },
     "dependencies": {
-        "@coral-xyz/anchor": "^0.30.1"
+        "@coral-xyz/anchor": "^0.30.1",
+        "arweave": "^1.14.4",
+        "@solana/spl-token": "^0.3.9",
+        "@solana/web3.js": "^1.87.6"
     },
     "devDependencies": {
         "chai": "^4.3.4",

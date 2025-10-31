@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("6HD4mpueEPSMWMFCVraYnKC4Kyg1KJyqZLMHPJEJgh63");
+declare_id!("A7ofZzn2ucRg1qN1dZEHTHoJr4U9trwdyifiJACkwU8C");
 
 #[program]
 pub mod solana_program {
@@ -52,6 +52,36 @@ pub mod solana_program {
 
         Ok(())
     }
+
+    /// Mint a Yellow Ribbon accessory NFT
+    /// Payment should be handled separately by the mobile app before calling this
+    pub fn mint_yellow_ribbon(ctx: Context<MintAccessory>, name: String) -> Result<()> {
+        let accessory = &mut ctx.accounts.accessory;
+        let clock = Clock::get()?;
+
+        accessory.owner = ctx.accounts.owner.key();
+        accessory.accessory_type = AccessoryType::YellowRibbon;
+        accessory.name = name;
+        accessory.mint_date = clock.unix_timestamp;
+        accessory.equipped = false;
+        accessory.bump = ctx.bumps.accessory;
+
+        msg!("🎀 Yellow Ribbon minted for owner: {}", accessory.owner);
+        msg!("Name: {}", accessory.name);
+
+        Ok(())
+    }
+
+    /// Equip or unequip an accessory on the companion
+    pub fn toggle_accessory(ctx: Context<ToggleAccessory>) -> Result<()> {
+        let accessory = &mut ctx.accounts.accessory;
+        accessory.equipped = !accessory.equipped;
+
+        let status = if accessory.equipped { "equipped" } else { "unequipped" };
+        msg!("Yellow Ribbon {} for companion", status);
+
+        Ok(())
+    }
 }
 
 // Account Structures
@@ -86,6 +116,36 @@ pub struct UpdateCompanion<'info> {
     pub owner: Signer<'info>,
 }
 
+#[derive(Accounts)]
+pub struct MintAccessory<'info> {
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + Accessory::INIT_SPACE,
+        seeds = [b"accessory", owner.key().as_ref(), b"yellow_ribbon"],
+        bump
+    )]
+    pub accessory: Account<'info, Accessory>,
+
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ToggleAccessory<'info> {
+    #[account(
+        mut,
+        seeds = [b"accessory", owner.key().as_ref(), b"yellow_ribbon"],
+        bump = accessory.bump,
+        has_one = owner @ CompanionError::UnauthorizedOwner
+    )]
+    pub accessory: Account<'info, Accessory>,
+
+    pub owner: Signer<'info>,
+}
+
 // Data Structures
 
 #[account]
@@ -96,6 +156,27 @@ pub struct Companion {
     pub interaction_count: u64,  // 8 bytes
     pub last_interaction: i64,   // 8 bytes (Unix timestamp)
     pub bump: u8,                // 1 byte (PDA bump)
+}
+
+#[account]
+#[derive(InitSpace)]
+pub struct Accessory {
+    pub owner: Pubkey,           // 32 bytes
+    pub accessory_type: AccessoryType, // 1 byte (enum)
+    #[max_len(50)]
+    pub name: String,            // 4 + 50 bytes
+    pub mint_date: i64,          // 8 bytes (Unix timestamp)
+    pub equipped: bool,          // 1 byte
+    pub bump: u8,                // 1 byte (PDA bump)
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, InitSpace)]
+pub enum AccessoryType {
+    YellowRibbon,
+    // Can add more accessories later:
+    // BlueHat,
+    // PinkBow,
+    // Glasses,
 }
 
 // Custom Errors
