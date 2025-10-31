@@ -42,6 +42,7 @@ dependencies:
   url_launcher: ^6.2.0
   app_links: ^6.3.2  # For deep-link handling
   cryptography: ^2.7.0  # For encryption
+  crypto: ^3.0.3  # For SHA256 hashing (discriminator calculation)
   bs58: ^1.0.2  # For base58 encoding
   pinenacl: ^0.6.0  # TweetNaCl-compatible NaCl implementation
   privy_flutter: ^0.4.0  # Privy embedded wallet

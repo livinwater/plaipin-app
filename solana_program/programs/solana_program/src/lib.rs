@@ -55,7 +55,8 @@ pub mod solana_program {
 
     /// Mint a Yellow Ribbon accessory NFT
     /// Payment should be handled separately by the mobile app before calling this
-    pub fn mint_yellow_ribbon(ctx: Context<MintAccessory>, name: String) -> Result<()> {
+    /// Uses timestamp as seed to allow multiple Yellow Ribbons per user
+    pub fn mint_yellow_ribbon(ctx: Context<MintAccessory>, name: String, seed: u64) -> Result<()> {
         let accessory = &mut ctx.accounts.accessory;
         let clock = Clock::get()?;
 
@@ -64,21 +65,23 @@ pub mod solana_program {
         accessory.name = name;
         accessory.mint_date = clock.unix_timestamp;
         accessory.equipped = false;
+        accessory.seed = seed;
         accessory.bump = ctx.bumps.accessory;
 
         msg!("🎀 Yellow Ribbon minted for owner: {}", accessory.owner);
         msg!("Name: {}", accessory.name);
+        msg!("Seed: {}", seed);
 
         Ok(())
     }
 
     /// Equip or unequip an accessory on the companion
-    pub fn toggle_accessory(ctx: Context<ToggleAccessory>) -> Result<()> {
+    pub fn toggle_accessory(ctx: Context<ToggleAccessory>, seed: u64) -> Result<()> {
         let accessory = &mut ctx.accounts.accessory;
         accessory.equipped = !accessory.equipped;
 
         let status = if accessory.equipped { "equipped" } else { "unequipped" };
-        msg!("Yellow Ribbon {} for companion", status);
+        msg!("Yellow Ribbon (seed: {}) {} for companion", seed, status);
 
         Ok(())
     }
@@ -117,12 +120,13 @@ pub struct UpdateCompanion<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(name: String, seed: u64)]
 pub struct MintAccessory<'info> {
     #[account(
         init,
         payer = owner,
         space = 8 + Accessory::INIT_SPACE,
-        seeds = [b"accessory", owner.key().as_ref(), b"yellow_ribbon"],
+        seeds = [b"accessory", owner.key().as_ref(), seed.to_le_bytes().as_ref()],
         bump
     )]
     pub accessory: Account<'info, Accessory>,
@@ -134,10 +138,11 @@ pub struct MintAccessory<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(seed: u64)]
 pub struct ToggleAccessory<'info> {
     #[account(
         mut,
-        seeds = [b"accessory", owner.key().as_ref(), b"yellow_ribbon"],
+        seeds = [b"accessory", owner.key().as_ref(), seed.to_le_bytes().as_ref()],
         bump = accessory.bump,
         has_one = owner @ CompanionError::UnauthorizedOwner
     )]
@@ -167,6 +172,7 @@ pub struct Accessory {
     pub name: String,            // 4 + 50 bytes
     pub mint_date: i64,          // 8 bytes (Unix timestamp)
     pub equipped: bool,          // 1 byte
+    pub seed: u64,               // 8 bytes (unique seed for multiple mints)
     pub bump: u8,                // 1 byte (PDA bump)
 }
 
