@@ -6,6 +6,11 @@ PlaiPin is a digital companion app built with Flutter and Solana blockchain inte
 
 PlaiPin combines a virtual companion with blockchain-powered NFT accessories, creating a unique digital pet experience. The app features a physical device integration, mood tracking, voice interactions, and a marketplace for customizing your companion.
 
+
+## 📱 Technical Video
+
+https://youtu.be/TwOMZ0vqrFs
+
 ## 📱 App Structure
 
 ### 🏠 Home Screen
@@ -98,7 +103,7 @@ PlaiPin combines a virtual companion with blockchain-powered NFT accessories, cr
   - Privy Embedded Wallets
 
 ### Smart Contract Features
-- **Yellow Ribbon NFT**: On-chain minting with PDA (Program Derived Address)
+- **NFT minting**: On-chain minting with PDA (Program Derived Address)
 - **Accessory Ownership**: Verifiable on-chain ownership
 - **Multiple Instances**: Support for collecting multiple of same accessory
 - **Payment Transactions**: SOL transfers to treasury wallet
@@ -160,6 +165,7 @@ plaipin-app/
 - iOS/Android development environment
 - Solana CLI (for smart contract deployment)
 - Anchor Framework (for Solana development)
+- Decentralized storage (for diary memories contents)
 
 ### Mobile App Setup
 
@@ -260,34 +266,8 @@ PROGRAM_ID=A7ofZzn2ucRg1qN1dZEHTHoJr4U9trwdyifiJACkwU8C
 - Voice interactions
 - Multiple 3D model support
 
-### Upcoming Features 🚧
-- [ ] Trading system for accessories
-- [ ] Multi-device companion sync
-- [ ] More mini-apps (games, utilities)
-- [ ] AR (Augmented Reality) companion mode
-- [ ] Social features (visit other PlaiPins)
-- [ ] Limited edition accessories
-- [ ] Seasonal events and rewards
-- [ ] Companion evolution system
-
-## 🤝 Contributing
-
-This is a personal project, but suggestions and feedback are welcome!
-
-## 📄 License
-
-Proprietary - All rights reserved
 
 ## 🐛 Known Issues
 
-- Yellow Ribbon smart contract minting needs ByteArray type fix
 - Some accessories need position fine-tuning in 3D space
-- Phantom wallet deep-link may require app restart on iOS
 
-## 📞 Support
-
-For issues or questions, please check the codebase documentation or contact the development team.
-
----
-
-**Built with ❤️ using Flutter & Solana**
