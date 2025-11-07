@@ -20,6 +20,7 @@ class _DeviceScreenState extends State<DeviceScreen> with SingleTickerProviderSt
   String _deviceId = '60742';
   DeviceTab _selectedTab = DeviceTab.battery;
   bool _isSyncing = false;
+  bool _isScanning = false;
   late AnimationController _syncAnimationController;
 
   @override
@@ -35,6 +36,31 @@ class _DeviceScreenState extends State<DeviceScreen> with SingleTickerProviderSt
   void dispose() {
     _syncAnimationController.dispose();
     super.dispose();
+  }
+
+  void _scanBluetooth() {
+    if (_isScanning) return;
+    
+    setState(() {
+      _isScanning = true;
+    });
+    
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isConnected 
+                ? '✓ Bluetooth device detected!' 
+                : '⚠ No Bluetooth device found'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: _isConnected ? Colors.blue : Colors.orange,
+          ),
+        );
+      }
+    });
   }
 
   void _startSync() {
@@ -112,6 +138,18 @@ class _DeviceScreenState extends State<DeviceScreen> with SingleTickerProviderSt
                   ),
                   Row(
                     children: [
+                      // Bluetooth scan button
+                      IconButton(
+                        onPressed: _isScanning ? null : _scanBluetooth,
+                        icon: Icon(
+                          _isScanning ? Icons.bluetooth_searching : Icons.bluetooth,
+                        ),
+                        iconSize: 28,
+                        color: _isScanning 
+                            ? AppTheme.primaryPink 
+                            : (_isConnected ? Colors.blue : AppTheme.darkGray),
+                        tooltip: 'Scan for Bluetooth devices',
+                      ),
                       // Sync button with animation
                       RotationTransition(
                         turns: _syncAnimationController,
