@@ -368,8 +368,9 @@ class WalletService extends ChangeNotifier {
       debugPrint('  - Nonce: ${encryptedMessage.nonce.length} bytes');
       
       // Step 3: Base58 encode the encrypted payload and nonce
-      final payloadBase58 = base58.encode(Uint8List.fromList(encryptedMessage.cipherText));
-      final nonceBase58 = base58.encode(Uint8List.fromList(encryptedMessage.nonce));
+      // Convert ByteList to Uint8List via .toList()
+      final payloadBase58 = base58.encode(Uint8List.fromList(encryptedMessage.cipherText.toList()));
+      final nonceBase58 = base58.encode(Uint8List.fromList(encryptedMessage.nonce.toList()));
       
       // Step 4: Build Phantom sign transaction URL with encrypted payload
       final redirectLink = '$redirectScheme://signed';
