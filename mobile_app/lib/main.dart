@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:async';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
@@ -69,6 +70,16 @@ class _MainNavigationState extends State<MainNavigation> {
   void initState() {
     super.initState();
     _initDeepLinks();
+    _requestBluetoothPermissions();
+  }
+  
+  /// Request Bluetooth permissions on app launch
+  Future<void> _requestBluetoothPermissions() async {
+    await [
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.location,
+    ].request();
   }
 
   @override

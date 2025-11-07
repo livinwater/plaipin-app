@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/inventory_service.dart';
 
@@ -38,29 +39,196 @@ class _DeviceScreenState extends State<DeviceScreen> with SingleTickerProviderSt
     super.dispose();
   }
 
-  void _scanBluetooth() {
+  Future<void> _scanBluetooth() async {
     if (_isScanning) return;
     
-    setState(() {
-      _isScanning = true;
-    });
+    debugPrint('🔵 Starting Bluetooth scan...');
     
-    Future.delayed(const Duration(seconds: 2), () {
+    try {
+      // Check if Bluetooth is supported
+      if (await FlutterBluePlus.isSupported == false) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ Bluetooth not supported on this device'),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+      
+      // Check if Bluetooth is turned on
+      final adapterState = await FlutterBluePlus.adapterState.first;
+      debugPrint('🔵 Bluetooth adapter state: $adapterState');
+      
+      if (adapterState != BluetoothAdapterState.on) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Bluetooth is Off'),
+              content: const Text('Please turn on Bluetooth in your device settings to scan for nearby devices.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+      
+      setState(() {
+        _isScanning = true;
+      });
+      
+      debugPrint('🔵 Bluetooth is ON, starting scan...');
+      debugPrint('🔵 iOS will show permission dialog if this is first time...');
+      
+      // Start scanning - iOS will show permission dialog automatically on first use
+      List<ScanResult> devices = [];
+      
+      // Start the scan
+      await FlutterBluePlus.startScan(
+        timeout: const Duration(seconds: 5),
+        androidUsesFineLocation: false,
+      );
+      
+      // Listen to scan results
+      final subscription = FlutterBluePlus.scanResults.listen((results) {
+        devices = results;
+        if (results.isNotEmpty) {
+          debugPrint('🔵 Found ${results.length} devices...');
+        }
+      });
+      
+      // Wait for scan to complete
+      await Future.delayed(const Duration(seconds: 5));
+      await FlutterBluePlus.stopScan();
+      subscription.cancel();
+      
+      debugPrint('✅ Scan complete. Found ${devices.length} devices total.');
+      
       if (mounted) {
         setState(() {
           _isScanning = false;
         });
+        
+        if (devices.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No devices found. Make sure Bluetooth devices are nearby and turned on.'),
+              duration: Duration(seconds: 3),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          // Show dialog with found devices
+          _showDevicesDialog(devices);
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error during Bluetooth scan: $e');
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+        });
+        
+        String errorMessage = e.toString();
+        if (errorMessage.contains('unauthorized') || errorMessage.contains('permission')) {
+          errorMessage = 'Bluetooth permission denied. Please grant Bluetooth access in Settings.';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isConnected 
-                ? '✓ Bluetooth device detected!' 
-                : '⚠ No Bluetooth device found'),
-            duration: const Duration(seconds: 2),
-            backgroundColor: _isConnected ? Colors.blue : Colors.orange,
+            content: Text('Error: $errorMessage'),
+            duration: const Duration(seconds: 4),
+            backgroundColor: Colors.red,
           ),
         );
       }
-    });
+    }
+  }
+  
+  void _showDevicesDialog(List<ScanResult> devices) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Bluetooth Devices Found'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: devices.length,
+            itemBuilder: (context, index) {
+              final device = devices[index].device;
+              final rssi = devices[index].rssi;
+              final name = device.platformName.isNotEmpty 
+                  ? device.platformName 
+                  : 'Unknown Device';
+              
+              return ListTile(
+                leading: Icon(
+                  Icons.bluetooth,
+                  color: Colors.blue,
+                ),
+                title: Text(name),
+                subtitle: Text('Signal: $rssi dBm\n${device.remoteId}'),
+                isThreeLine: true,
+                trailing: IconButton(
+                  icon: const Icon(Icons.link),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _connectToDevice(device);
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Future<void> _connectToDevice(BluetoothDevice device) async {
+    try {
+      await device.connect(timeout: const Duration(seconds: 10));
+      
+      if (mounted) {
+        setState(() {
+          _isConnected = true;
+          _deviceId = device.remoteId.toString().substring(0, 5);
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✓ Connected to ${device.platformName}'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to connect: ${e.toString()}'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _startSync() {
